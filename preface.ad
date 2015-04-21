@@ -1,1 +1,26 @@
-Preface left intentionally blank, until someone writes some proper content for it.
+== Housekeeping
+
+If you find a misteak while reading this book, please file an issue on the [Errata Repo](https://github.com/rubysherpas/rails_init_book_errata) on GitHub with the following details:
+
+* Which page you found the mistake on
+* What the mistake actually is
+* And a helpful suggestion for fixing it
+
+That'd be great! This far into the book and there's already one mistake. You're almost guaranteed that there will be others. Their ways are wily and devious. **BEWARE!**.
+
+== Preface
+
+This book will show you how Rails boots up and is particularly written for the
+4.2.1 version of Rails.
+
+This book has been a long time coming. I (Ryan) originally started writing something along these same lines when I was taking donations to work on Rails documentation back at the end of 2010. I got about 8,000 words into writing it as a Rails guide and figured that nobody would want to read a guide that long and so I gave up. 
+
+Since then, I've written a couple of books (Rails 4 in Action + Multitenancy with Rails) and I've found that books are great for long-form content, like what you're about to read. 
+
+This book is a deep-dive and if you wanted us to put to a rating on the level of this book, I would place it at "Intermediate". This is a book which assumes that you've got a moderately-good-but-not-expert-so-don't-stress-about-it kind of knowledge of Ruby and Rails. The book won't explain basic Ruby or Rails concepts to you, as you should already be familiar with those. If you know the difference between a model and a controller or a module and a class, this book will be easy for you to read.
+
+What the book *will* do is go from start-to-finish through the entirety of the Rails initialization process. Then -- for a bit of extra fun -- we'll go through the process of what happens when a very plain action is rendered from a Rails controller. So while this book is called "The Rails Initialization Process", you're actually getting two deep-dives for the price of one. Isn't that nice?
+
+Enough waffling, let's get started.
+
+
