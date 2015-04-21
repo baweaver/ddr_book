@@ -1,0 +1,3 @@
+:source-highlighter: pygments
+
+include::book.ad[]

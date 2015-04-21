@@ -1,0 +1,10 @@
+= The Rails Initialization Process
+:numbered!:
+:toc: right
+:toclevels: 1
+
+include::preface.ad[]
+
+:numbered:
+
+include::ch01/ch01.ad[]
