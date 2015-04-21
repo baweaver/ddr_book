@@ -1,3 +1,53 @@
-== Introduction
+== Starting Rails
 
-An introduction goes here.
+To start a deep-dive the best thing to do is to start at the beginning. What
+we want to learn is how Rails boots up and serves requests. In a local
+development environment, on a brand new Rails application, the way to boot up
+a Rails application is with this command:
+
+----
+rails s
+----
+
+We know the general gist of what this command does: it starts a Rails server.
+But what is it _really_ doing? To find out, we're going to need to run this
+command in a real Rails application, so let's create one of those now and name
+it inventively "init_book":
+
+----
+rails new init_book
+----
+
+Now that we have our application up, let's see what happens when we run that
+`rails s` command. We'll see this output:
+
+----
+=> Booting WEBrick
+=> Rails 4.2.1 application starting in development on http://localhost:3000
+=> Run `rails server -h` for more startup options
+=> Ctrl-C to shutdown server
+[timestamp] INFO  WEBrick 1.3.1
+[timestamp] INFO  ruby 2.1.5 (2014-11-13) [x86_64-darwin14.0]
+[timestamp] INFO  WEBrick::HTTPServer#start: pid=9901 port=3000
+----
+
+You're probably already familiar with that output -- or something very similar
+to it -- already. Of course when we go to http://localhost:3000 in our browser
+we'll see the very familiar "Welcome Aboard" page.
+
+image::ch01/images/welcome_aboard.png[]
+
+How does this command work? We can find out on any UNIX system by running the
+`which` command:
+
+----
+which rails
+----
+
+The `which` utility will tell us where a program lives in the user's `$PATH`.
+If you're on Windows, you probably have something like this but we're not
+Windows users, so you'll have to figure that out yourself.
+
+
+
+
