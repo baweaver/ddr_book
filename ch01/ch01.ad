@@ -168,6 +168,206 @@ end
 require "rails/cli"
 ----
 
+This file first checks to see if there's a `.git` directory three directories
+up from the path where this file is. There would only be a `.git` directory if
+we were attempting to use this file in a cloned version of Rails. In this
+case, the `railties` gem might not be in the `$LOAD_PATH` already or if it is,
+it might be a different version to the one in the repo. The code inside the
+`if` here adds the `lib` directory to the beginning of the `$LOAD_PATH` using
+its shorthand variant of `$:` and `unshift`. [footnote: The code inside the
+`if` is not ran in a typical Rails application, but is still worth covering
+for those who are curious to know what it does.]
+
+The final line in this file requires the file `rails/cli`. The code above it
+can give us some indication of where we might find it: in the `railties` gem
+itself. Indeed, that is where it is. Let's move over to that file now.
+
+=== [railties gem]/lib/rails/cli.rb
+
+The contents of this file are:
+
+.[railties gem]/lib/rails/cli.rb
+[source, ruby]
+----
+require 'rails/app_rails_loader'
+
+# If we are inside a Rails application this method performs an exec and thus
+# the rest of this script is not run.
+Rails::AppRailsLoader.exec_app_rails
+
+require 'rails/ruby_version_check'
+Signal.trap("INT") { puts; exit(1) }
+
+if ARGV.first == 'plugin'
+  ARGV.shift
+  require 'rails/commands/plugin'
+else
+  require 'rails/commands/application'
+end
+----
+
+The first line of this file requires `rails/app_rails_loader`, and the second
+line runs a method called `Rails::AppRailsLoader.exec_app_rails` which would
+seem like it has been defined in that file based on the similarity of the
+class name and the filename. As the comment says, if we're inside a Rails
+application this is where this file stops and `exec_app_rails` takes over.
+We'll get to that in a minute. Let's see what the rest of the file has for us first.
+
+The next line is a require to `rails/ruby_version_check` which requires this file:
+
+[source, ruby]
+.[railties gem]/lib/rails/ruby_version_check.rb
+----
+if RUBY_VERSION < '1.9.3'
+  desc = defined?(RUBY_DESCRIPTION) ? RUBY_DESCRIPTION : "ruby #{RUBY_VERSION} (#{RUBY_RELEASE_DATE})"
+  abort <<-end_message
+
+    Rails 4 prefers to run on Ruby 2.1 or newer.
+
+    You're running
+      #{desc}
+
+    Please upgrade to Ruby 1.9.3 or newer to continue.
+
+  end_message
+end
+----
+
+The code here checks the `RUBY_VERSION` constant defined by the Ruby
+interpreter that we're using. If that is less than Ruby 1.9.3, this file will
+abort the process using the `abort` method. The message it will abort with is
+everything between `<<-end_message` and its counterpart, `end_message`; a
+Heredoc.
+
+This is done because there is some code in Rails which just isn't compatible
+with earlier versions. Ruby 1.9.1 and Ruby 1.9.2 have been known to have
+issues, and so the Rails Core Team have decided to only support Ruby 1.9.3 and
+above.
+
+[NOTE]
+.Ruby 2.2.2 and up supported by Rails 5
+====
+
+In Rails 5 this version restriction will be changing to Ruby 2.2.2:
+http://git.io/vflFM. Probably as an encouragement for people to upgrade their
+Rubies when they upgrade their Rails versions.
+
+====
+
+Let's jump back to the `[railties gem]/lib/rails/cli.rb` file and the remainder of its code:
+
+.[railties gem]/lib/rails/cli.rb
+[source, ruby]
+----
+Signal.trap("INT") { puts; exit(1) }
+
+if ARGV.first == 'plugin'
+  ARGV.shift
+  require 'rails/commands/plugin'
+else
+  require 'rails/commands/application'
+end
+----
+
+The `Signal.trap` method here will trap an `INT` signal; typically issued by
+`Command+C` or `Control+C` shortcuts. If that code encounters one of these
+signals, it will `exit` with a code of `1`, indicating that the process didn't
+run correctly.
+
+The final lines for this file check if the first argument provided to the
+`rails` command is "plugin". If that's the case, it will require
+`rails/commands/plugin`. This would happen if you were to run the command
+`rails plugin new`, for example. If the argument isn't "plugin" then it's
+assumed you want to do something with the application, and
+`rails/commands/application` is loaded instead.
+
+To find out what those do, go on and explore yourself. Consider it the first
+piece of homework in this book! The book will continue to focus on what
+happens when we start an application, and the next step begins with the file
+that we first saw required at the top of `rails/cli.rb`: `rails/app_rails_loader.rb`.
+
+=== [railties gem]/lib/rails/app_rails_loader.rb
+
+This file is the longest file we've seen so far. Let's look at it in parts. The first part contains this:
+
+[source, ruby]
+----
+require 'pathname'
+
+module Rails
+  module AppRailsLoader
+    extend self
+
+    RUBY = Gem.ruby
+    EXECUTABLES = ['bin/rails', 'script/rails']
+    BUNDLER_WARNING = <<EOS
+Looks like your app's ./bin/rails is a stub that was generated by Bundler.
+
+In Rails 4, your app's bin/ directory contains executables that are versioned
+like any other source code, rather than stubs that are generated on demand.
+
+Here's how to upgrade:
+
+  bundle config --delete bin    # Turn off Bundler's stub generator
+  rake rails:update:bin         # Use the new Rails 4 executables
+  git add bin                   # Add bin/ to source control
+
+You may need to remove bin/ from your .gitignore as well.
+
+When you install a gem whose executable you want to use in your app,
+generate it and add it to source control:
+
+  bundle binstubs some-gem-name
+  git add bin/new-executable
+
+EOS
+----
+
+This sets up a couple of constants: `RUBY`, `EXECUTABLES` and `BUNDLER_WARNING`. The `RUBY` constant defined here will be the path to the Ruby binary, which on my machine is `/Users/ryanbigg/.rubies/ruby-2.2.2/bin/ruby`. All of these constants are used in the latter half of the file, which contains the `exec_rails_app` method that was called from `rails/cli.rb`:
+
+[source, ruby]
+----
+def exec_app_rails
+  original_cwd = Dir.pwd
+
+  loop do
+    if exe = find_executable
+      contents = File.read(exe)
+
+      if contents =~ /(APP|ENGINE)_PATH/
+        exec RUBY, exe, *ARGV
+        break # non reachable, hack to be able to stub exec in the test suite
+      elsif exe.end_with?('bin/rails') && contents.include?('This file was generated by Bundler')
+        $stderr.puts(BUNDLER_WARNING)
+        Object.const_set(:APP_PATH, File.expand_path('config/application', Dir.pwd))
+        require File.expand_path('../boot', APP_PATH)
+        require 'rails/commands'
+        break
+      end
+    end
+
+    # If we exhaust the search there is no executable, this could be a
+    # call to generate a new application, so restore the original cwd.
+    Dir.chdir(original_cwd) and return if Pathname.new(Dir.pwd).root?
+
+    # Otherwise keep moving upwards in search of an executable.
+    Dir.chdir('..')
+  end
+end
+
+def find_executable
+  EXECUTABLES.find { |exe| File.file?(exe) }
+end
+----
+
+
+
+
+
+
+
+
+
 
 
 
