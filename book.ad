@@ -8,3 +8,4 @@ include::preface.ad[]
 :numbered:
 
 include::ch01/ch01.ad[]
+include::ch02/ch02.ad[]
