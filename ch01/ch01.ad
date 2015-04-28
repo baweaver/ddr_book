@@ -420,7 +420,10 @@ ENV['BUNDLE_GEMFILE'] ||= File.expand_path('../../Gemfile', __FILE__)
 require 'bundler/setup' # Set up gems listed in the Gemfile.
 ----
 
-This file configures the environment variable `BUNDLE_GEMFILE`; but only if it's not already set. The final line requires `bundler/setup`, which is responsible for enabling the `Bundler.setup` method we'll see very shortly.
+This file configures the environment variable `BUNDLE_GEMFILE`; but only if
+it's not already set. The final line requires `bundler/setup`, which is
+responsible for adding all the gems in the `Gemfile` to the `$LOAD_PATH`. This
+is what will enable some of the `require` calls to work in a little while.
 
 The final line of `[our application]/bin/rails` will lead into where we go next: back to the Railties gem.
 
@@ -450,22 +453,163 @@ require 'rails/commands/commands_tasks'
 Rails::CommandsTasks.new(ARGV).run_command!(command)
 ----
 
-This is the file where those nice little shortcuts like `rails g` and `rails s` are defined. What this code will do is pick the first argument from `ARGV` with a quick `shift`, and then check to see if that argument has a key in the `aliases` method. If it doesn't, then it's assumed to be the command itself. So it doesn't matter if you run "rails server" or "rails s" after this point, because command will always be "server".
+This is the file where those nice little shortcuts like `rails g` and `rails
+s` are defined. What this code will do is pick the first argument from `ARGV`
+with a quick `shift`, and then check to see if that argument has a key in the
+`aliases` method. If it doesn't, then it's assumed to be the command itself.
+So it doesn't matter if you run "rails server" or "rails s" after this point,
+because command will always be "server".
 
-The next line requires `rails/commands/commands_tasks`, which is then used to run the command that we've given it.
+The next line requires `rails/commands/commands_tasks`. This is used to run
+the command that we've given it by initializing a new instance of
+`Rails::CommandsTasks`, and then calling `run_command!` on that, passing in
+the `command` variable as the only argument to this method. Let's look at what
+this does.
 
+=== [railties gem]/lib/rails/commands_tasks.rb
 
+This is another large file. We're only interested in the `server` command, so let's look first at what the `run_command!` method does, and then the `server` command.
 
+[source, ruby]
+.[railties gem]/lib/rails/commands_tasks.rb
+----
+COMMAND_WHITELIST = %w(plugin generate destroy console server dbconsole runner new version help)
 
+...
 
+def run_command!(command)
+  command = parse_command(command)
+  if COMMAND_WHITELIST.include?(command)
+    send(command)
+  else
+    write_error_message(command)
+  end
+end
 
+...
 
+def write_error_message(command)
+  puts "Error: Command '#{command}' not recognized"
+  if %x{rake #{command} --dry-run 2>&1 } && $?.success?
+    puts "Did you mean: `$ rake #{command}` ?\n\n"
+  end
+  write_help_message
+  exit(1)
+end
 
+def parse_command(command)
+  case command
+  when '--version', '-v'
+    'version'
+  when '--help', '-h'
+    'help'
+  else
+    command
+  end
+end
+----
 
+The `run_command` method relies on a few other parts of this file, which are
+included in the above example. First, the `parse_command` method is called.
+This standardises the command that was passed in if that command was one of `'
+--version'`, `'-v'`, `'--help'` or '-h'. This is similar to the aliasing that
+was done previously in `rails/commands.rb`.
 
+Next, the `COMMAND_WHITELIST` constant is checked. If the command isn't listed
+there, then the `write_error_message` method is called, which will tell us
+that the command wasn't recognized. The remainder of the `write_error_message`
+command will check to see if there's a Rake task with the same name as the
+command. This is helpful if people ever try to run something like `rails
+db:migrate`. The help text (not included in the above example because it's so
+damn long) at the top of this file is output if the command isn't found.
 
+We're on the path of the `server` command, and what `run_command!` does after
+checking if the command is on the whitelist is it calls `send` to call a
+method that matches that command's name. In the case of our sleuthing, this is
+the `server` method:
 
+[source, ruby]
+----
+def server
+  set_application_directory!
+  require_command!("server")
 
+  Rails::Server.new.tap do |server|
+    # We need to require application after the server sets environment,
+    # otherwise the --environment option given to the server won't propagate.
+    require APP_PATH
+    Dir.chdir(Rails.application.root)
+    server.start
+  end
+end
+----
+
+The `server` command first calls `set_application_directory!`, and then comment above that method does a great job at explaining what that method is for:
+
+[source, ruby]
+----
+
+private
+
+# Change to the application's path if there is no config.ru file in current directory.
+# This allows us to run `rails server` from other directories, but still get
+# the main config.ru and properly set the tmp directory.
+def set_application_directory!
+  Dir.chdir(File.expand_path('../../', APP_PATH)) unless File.exist?(File.expand_path("config.ru"))
+end
+----
+
+Next, the `require_command!` method is called, which is simply this:
+
+[source, ruby]
+----
+def require_command!(command)
+  require "rails/commands/#{command}"
+end
+----
+
+ALl that's doing is requiring `rails/commands/server.rb`, which defines the `Rails::Server` constant that we're about to use. Let's look at that file now.
+
+=== [railties gem]/lib/rails/commands/server.rb
+
+The `server` method that we just looked at starts the Rails server by running this code:
+
+[source, ruby]
+----
+Rails::Server.new.tap do |server|
+  # We need to require application after the server sets environment,
+  # otherwise the --environment option given to the server won't propagate.
+  require APP_PATH
+  Dir.chdir(Rails.application.root)
+  server.start
+end
+----
+
+Since this is initializing an instance of the `Rails::Server` class, let's look at the `initialize` method from `Rails::Server` first:
+
+[source, ruby]
+----
+def initialize(*)
+  super
+  set_environment
+end
+----
+
+To understand what this method is about to do, we need to take a _huge_ step back and look at how the `Rails::Server` class is defined:
+
+----
+require 'fileutils'
+require 'optparse'
+require 'action_dispatch'
+require 'rails'
+
+module Rails
+  class Server < ::Rack::Server
+----
+
+There is a lot of complexity hidden in these lines. In order to understand
+what's about to happen we'll need to look at what the `action_dispatch` and
+`rails` requires are doing. It turns out that they do quite a lot.
 
 
 

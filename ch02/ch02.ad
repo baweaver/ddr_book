@@ -1,2 +1,264 @@
-# Beginnings
+== Action Dispatch
+
+Action Dispatch is the component of Rails that is responsible for handling
+requests. We'll revisit this part much later in this book when we're looking
+at the request cycle. Still, it's important to know what it's loading here in
+order to understand how the `Rails::Server` class begins to serve our
+application.
+
+=== A short interlude about `bundler/setup`
+
+The require that we're looking at was one for `action_dispatch`. The ability
+to require this file was provided by Bundler, particularly the `require
+'bundler/setup'` line from `config/boot.rb`. That line triggered Bundler to
+inspect our Gemfile and to load all the gems into the `$LOAD_PATH`. If we want
+to see what this did, we only need to run this code in an `irb` session...
+although it'll look much better in a `pry` session:
+
+[source, ruby]
+----
+puts $:.count
+require 'bundler/setup'
+puts $:
+
+["/Users/ryanbigg/.gem/ruby/2.2.2/gems/web-console-2.1.2/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/uglifier-2.7.1/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/turbolinks-2.5.3/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/extensions/x86_64-darwin-14/2.2.0-static/sqlite3-1.3.10",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/sqlite3-1.3.10/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/spring-1.3.4/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/sdoc-0.4.1/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/sass-rails-5.0.3/lib",
+ "/Users/ryanbigg/.gem/ruby/2.2.2/gems/tilt-1.4.1/lib",
+ ....
+]
+puts $:.count
+----
+
+Before we call `require 'bundler/setup'` there are 12 paths in `$LOAD_PATH`.
+12 paths where Ruby can find files to require. At least, that's what happens
+on my machine. Yours might be slighty different, depending on how Ruby is
+setup. After we require  `bundler/setup`, all those gems that Bundler has
+resolved to be dependencies of our application will be added to the
+`$LOAD_PATH`. 
+
+When we require `action_dispatch` (for example), this will load the file
+contained in one of these gems called `action_dispatch.rb`. It is safe to
+assume that it is very unlikely that more than one gem has this file in its
+path. To find out where this file is located, we can run this code in the same
+`irb` (or `pry`) session as above:
+
+[source, ruby]
+----
+$:.detect do |p|
+  Dir[p + "**/*"].detect do |p2|
+    p2.include?("action_dispatch.rb")
+  end
+end
+----
+
+In my `irb` session, this code tells me that the path is located at 
+
+----
+"/Users/ryanbigg/.gem/ruby/2.2.2/gems/actionpack-4.2.1/lib"
+----
+
+We've spent a lot of our time so far in the `railties` gem and some other time
+in our application. Now it's time to start looking at a new gem: the
+`actionpack` gem.
+
+=== [actionpack gem]/lib/action_dispatch.rb
+
+This file is responsible for setting up the Action Dispatch component of
+Rails. The Action Dispatch component is responsible for handling requests that
+are arriving in our server. 
+
+==== ActiveSupport bootstrapping
+
+Before it can do anything like that, it needs to initialze. It does this by
+loading a few things from Active Support:
+
+[source, ruby]
+----
+require 'active_support'
+require 'active_support/rails'
+require 'active_support/core_ext/module/attribute_accessors'
+----
+
+The first file here requires `active_support`. This file is located within the
+`actionsupport` gem and it requires a few things itself:
+
+.[activesupport gem]/lib/active_support.rb
+[source, ruby]
+----
+require 'securerandom'
+require "active_support/dependencies/autoload"
+require "active_support/version"
+require "active_support/logger"
+require "active_support/lazy_load_hooks"
+----
+
+Of particular note here is the `active_support/dependencies/autoload` file,
+which the remainder of `active_support` uses extensively. Rather than going
+through the code, let's just cover briefly what autoloading does in Rails.
+
+Rather than requiring each file within ActiveSupport up-front, the files
+containing these constants will be required when their constants are
+referenced. For example, this line from `active_support.rb`:
+
+[source, ruby]
+----
+module ActiveSupport
+  ...
+
+  autoload :Concern
+----
+
+Will mean that referencing the `ActiveSupport::Concern` will automatically
+require the file at `[activesupport gem]/lib/active_support/concern.rb`. This
+isn't too good of an example because we'll see that `active_support/concern`
+gets required in the very near future. Other constants inside the
+`ActiveSupport` module might not be so lucky.
+
+The remaining requires in this file start with requiring
+`active_support/version` which defines the `ActiveSupport.version` method that
+we can use to check the version of Active Support that we're using. In the
+case of ActiveSupport this isn't *too* useful.
+
+The next require is for `ActiveSupport::Logger`, which enables better logging
+than what is provided by the Logger standard library.
+
+The final require is for `lazy_load_hooks.rb`. The documentation at the top of
+this file is particularly good. It shows us that we can define an `on_load`
+hook for any library that we wish, and that we can run these hooks once the
+library has finished loading. The example given is one for Active Record, but
+really this can be used for any library that wants to add hooks that will run
+later.
+
+==== Even more Active Support stuff
+
+Going back to `action_dispatch.rb`, there's still two `require` calls for
+Active Support stuff that we haven't covered yet:
+
+----
+require 'active_support/rails'
+require 'active_support/core_ext/module/attribute_accessors'
+----
+
+The `active_support/rails` line requires some very basic things that will be
+used throughout many of the files we will look at. Let's have a quick look at
+what's defined. The comments in that file are quite descriptive:
+
+----
+# Defines Object#blank? and Object#present?.
+require 'active_support/core_ext/object/blank'
+
+# Rails own autoload, eager_load, etc.
+require 'active_support/dependencies/autoload'
+
+# Support for ClassMethods and the included macro.
+require 'active_support/concern'
+
+# Defines Class#class_attribute.
+require 'active_support/core_ext/class/attribute'
+
+# Defines Module#delegate.
+require 'active_support/core_ext/module/delegation'
+
+# Defines ActiveSupport::Deprecation.
+require 'active_support/deprecation'
+----
+
+Rather than going into each of these, this book will leave that as an exercise
+to the reader. The core extension requires are explained in the wonderful Core
+Extensions Guide[footnote:
+http://guides.rubyonrails.org/active_support_core_extensions.html]. The
+`active_support/dependencies/autoload` file is the same as we saw earlier. The
+`active_support/concern` require is for `ActiveSupport::Concern`, which has a
+great set of documentation[footnote:
+http://devdocs.io/rails/activesupport/concern]. The final require in this file
+is for `ActiveSupport::Deprecation`[footnote:
+http://devdocs.io/rails/activesupport/deprecation], which is used within Rails
+to show deprecation warnings throughout.
+
+==== Back to Action Dispatch
+
+Going back to `action_dispatch.rb` now, and the next line isn't really of any consequence in the grand scheme of things:
+
+[source, ruby]
+----
+require 'action_pack'
+----
+
+This requires `action_pack` which requires `action_pack/version` which defines
+the `ActionPack` module for the first time in this whole execution process.
+Inside that module, the `actionpack/version` file defines a `version` method which can be used to get the
+current version of `ActionPack`[footnote: The version of ActionPack shouldn't be different to ActiveSupport's version].
+
+The line after the require for `action_pack` is much more interesting:
+
+[source, ruby]
+----
+require 'rack'
+----
+
+We can find out where this file lives by running this code again, this time in a `rails console` session. That's because you've probably closed the `pry` or `irb` sessions by now.
+
+[source, ruby]
+----
+$:.detect do |p|
+  Dir[p + "**/*"].detect do |p2|
+    p2.include?("rack.rb")
+  end
+end
+----
+
+On my machine, this is what that code returns:
+
+----
+=> "/Users/ryanbigg/.gem/ruby/2.2.2/gems/rack-1.6.0/lib"
+----
+
+Let's open up that Rack gem in our editor now and take a look at `rack.rb`. It's pretty well commented to start with. The constants may seem a bit weird at first:
+
+[source, ruby]
+.[rack gem]/lib/rack.rb
+----
+PATH_INFO      = 'PATH_INFO'.freeze
+REQUEST_METHOD = 'REQUEST_METHOD'.freeze
+SCRIPT_NAME    = 'SCRIPT_NAME'.freeze
+QUERY_STRING   = 'QUERY_STRING'.freeze
+CACHE_CONTROL  = 'Cache-Control'.freeze
+CONTENT_LENGTH = 'Content-Length'.freeze
+CONTENT_TYPE   = 'Content-Type'.freeze
+
+GET  = 'GET'.freeze
+HEAD = 'HEAD'.freeze
+----
+
+These constants are used in calls to the `env` Hash that Rack works with. If
+these strings were not frozen or constants, the strings would be allocated
+each time `env["PATH_INFO"]` (or similar) was accessed. By freezing the
+string, there's only one allocation of that string that happens.
+
+Past the constants, there's some more calls to `autoload`. What's interesting
+about these calls is that they specify a path. **This is because Ruby has
+built-in autoloading features.** [footnote: Read about `Kernel#autoload` here:
+http://ruby-doc.org/core-2.2.2/Kernel.html#method-i-autoload]. Rack is using
+this built-in `autoload` method, instead of the one Active Support provides.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
