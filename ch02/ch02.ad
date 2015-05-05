@@ -1,12 +1,14 @@
 == Action Dispatch & Rails
 
-In this chapter we'll look at what these two lines in `rails/server.rb` are doing:
+In this chapter we'll look at what these two lines in `rails/server.rb` are doing.
 
 [source, ruby]
 ----
 require 'action_dispatch'
 require 'rails'
 ----
+
+It turns out that they're doing enough things to fill an entire chapter.
 
 === Action Dispatch
 
@@ -181,13 +183,13 @@ require 'active_support/deprecation'
 
 Rather than going into each of these, this book will leave that as an exercise
 to the reader. The core extension requires are explained in the wonderful Core
-Extensions Guide[footnote:
+Extensions Guide footnote:[
 http://guides.rubyonrails.org/active_support_core_extensions.html]. The
 `active_support/dependencies/autoload` file is the same as we saw earlier. The
 `active_support/concern` require is for `ActiveSupport::Concern`, which has a
-great set of documentation[footnote:
+great set of documentation footnote:[
 http://devdocs.io/rails/activesupport/concern]. The final require in this file
-is for `ActiveSupport::Deprecation`[footnote:
+is for `ActiveSupport::Deprecation` footnote:[
 http://devdocs.io/rails/activesupport/deprecation], which is used within Rails
 to show deprecation warnings throughout.
 
@@ -203,7 +205,7 @@ require 'action_pack'
 This requires `action_pack` which requires `action_pack/version` which defines
 the `ActionPack` module for the first time in this whole execution process.
 Inside that module, the `actionpack/version` file defines a `version` method which can be used to get the
-current version of `ActionPack`[footnote: The version of ActionPack shouldn't be different to ActiveSupport's version].
+current version of `ActionPack`footnote:[ The version of ActionPack shouldn't be different to ActiveSupport's version].
 
 The line after the require for `action_pack` is much more interesting:
 
@@ -255,7 +257,7 @@ string, there's only one allocation of that string that happens.
 
 Past the constants, there's some more calls to `autoload`. What's interesting
 about these calls is that they specify a path. **This is because Ruby has
-built-in autoloading features.** [footnote: Read about `Kernel#autoload` here:
+built-in autoloading features.** footnote:[Read about `Kernel#autoload` here:
 http://ruby-doc.org/core-2.2.2/Kernel.html#method-i-autoload]. Rack is using
 this built-in `autoload` method, instead of the one Active Support provides.
 The one that Active Support provides is only enabled on a class or module by
@@ -340,9 +342,11 @@ it's depending on the `Mime` constant that comes from ActionDispatch.
 
 That completes the description for `action_dispatch.rb`. Let's move on to the second line that we've covering in this chapter, `rails.rb`.
 
-=== Rails, or more particularly, `rails.rb`
+=== [railties gem]/lib/rails.rb
 
-Or more particularly than than: `[railties gem]/lib/rails.rb`.
+This file is where the `Rails` module is first defined and where Rails starts
+to load some really important things like `rails/application` and
+`rails/engine` which are the heart and soul (or brains, I guess) of all Rails applications.
 
 [source, ruby]
 .[railties gem]/lib/rails.rb
@@ -366,13 +370,13 @@ constant which is used for file or directory names, and manipulation thereof.
 The remaining requires in that little snippet from this file require
 `active_support` and `active_support/dependencies/autoload` which we know have
 already been required. The `core_ext` files have good documentation
-themselves, so we won't be diving into them here[footnote: Remember you can
+themselves, so we won't be diving into them here footnote:[Remember you can
 also check out the Active Support Core Extensions Guide:
 http://guides.rubyonrails.org/active_support_core_extensions.html]
 
 The next require in this file is for `rails/application`. Let's take a look.
 
-==== [railties gem]/lib/rails/application.rb
+=== [railties gem]/lib/rails/application.rb
 
 This file the heart and soul of every Rails application. The comments here are
 very useful, particularly the part about the boot process, reproduced here:
@@ -409,9 +413,9 @@ require 'rails/engine'
 This file starts out by requiring `fileutils`, a couple of core extensions and
 two new files: `active_support/key_generator` and
 `active_support/message_verifier`. The docs for both
-`ActiveSupport::KeyGenerator`[footnote: `ActiveSupport::KeyGenerator`
+`ActiveSupport::KeyGenerator` footnote:[`ActiveSupport::KeyGenerator`
 http://devdocs.io/rails/activesupport/keygenerator] and
-`ActiveSupport::MessageVerifier`[footnote: `ActiveSupport::MessageVerifier`:
+`ActiveSupport::MessageVerifier` footnote:[`ActiveSupport::MessageVerifier`:
 http://devdocs.io/rails/activesupport/messageverifier] explain their purposes
 well enough that this book doesn't need to. Suffice to say: they're a big part
 of the built-in security of Rails.
@@ -428,13 +432,13 @@ application is itself an engine! That's pretty neat.
 
 Let's now take a look at that `rails/engine` file.
 
-==== [railties gem]/lib/rails/engine.rb
+=== [railties gem]/lib/rails/engine.rb
 
 As `Rails::Application` is the heart and soul of every Rails application,
 `Rails::Engine` is the heart and soul of every engine. The documentation for
 this class is well worth a read. Let's cover a few interesting points now.
 
-===== Configuring Generators
+==== Configuring Generators
 
 The `config.generators` method allows you to configure which generators are used for engines, and by extensions applications too:
 
@@ -484,7 +488,7 @@ engine.
 
 Don't use this feature.
 
-===== Configuring an endpoint
+==== Configuring an endpoint
 
 The next thing mentioned in the documentation for `Rails::Engine` is that you
 can define a Rack endpoint for this engine. The example it gives is this:
@@ -504,6 +508,26 @@ is override the `endpoint` for the engine, which would typically be the routes
 for the engine (defined at `[engine root]/config/routes.rb`). Rather than
 using those routes, the engine will now route requests to that Rack
 application.
+
+Engines are actually Rack applications themselves by default.
+
+==== Middleware
+
+You may know already that in applications we can use middleware. You know
+where this is going now. We can define middlewares to use inside an engine
+too:
+
+[source, ruby]
+----
+module MyEngine
+  class Engine < Rails::Engine
+    middleware.use SomeMiddleware
+  end
+end
+----
+
+When a request comes into the engine, it will be routed first through this
+middleware. Requests going through the application won't be routed this way.
 
 
 

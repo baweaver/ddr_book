@@ -99,7 +99,7 @@ gem 'railties', version
 load Gem.bin_path('railties', 'rails', version)
 ----
 
-This file is an executable and uses the shebang [footnote: Bash Shebang:
+This file is an executable and uses the shebang footnote:[Bash Shebang:
 http://en.wikipedia.org/wiki/Shebang_%28Unix%29] to parse the remainder of the
 program through a Ruby interpreter. Without this line, it would be interpreted
 as whatever shell scripting language you're using. That's probably going to be
@@ -121,7 +121,7 @@ It allows you to load a _different_ version of Rails and run that instead of
 whatever RubyGems would pick up by default. The code checks to see if the
 first argument (`ARGV.first`) matches this regular expression: `/\A_(.*)_\z/`.
 If it does, _and_ if that looks like a "correct" version according to RubyGems
-[footnote: For what RubyGems considers a "correct" version number, read these
+footnote:[For what RubyGems considers a "correct" version number, read these
 code comments from `Gem::Version`: http://git.io/vfs0Y], that version is used
 for what comes next.
 
@@ -174,7 +174,7 @@ we were attempting to use this file in a cloned version of Rails. In this
 case, the `railties` gem might not be in the `$LOAD_PATH` already or if it is,
 it might be a different version to the one in the repo. The code inside the
 `if` here adds the `lib` directory to the beginning of the `$LOAD_PATH` using
-its shorthand variant of `$:` and `unshift`. [footnote: The code inside the
+its shorthand variant of `$:` and `unshift`. footnote:[The code inside the
 `if` is not ran in a typical Rails application, but is still worth covering
 for those who are curious to know what it does.]
 
