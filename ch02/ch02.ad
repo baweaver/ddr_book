@@ -1,4 +1,14 @@
-== Action Dispatch
+== Action Dispatch & Rails
+
+In this chapter we'll look at what these two lines in `rails/server.rb` are doing:
+
+[source, ruby]
+----
+require 'action_dispatch'
+require 'rails'
+----
+
+=== Action Dispatch
 
 Action Dispatch is the component of Rails that is responsible for handling
 requests. We'll revisit this part much later in this book when we're looking
@@ -6,7 +16,7 @@ at the request cycle. Still, it's important to know what it's loading here in
 order to understand how the `Rails::Server` class begins to serve our
 application.
 
-=== A short interlude about `bundler/setup`
+==== A short interlude about `bundler/setup`
 
 The require that we're looking at was one for `action_dispatch`. The ability
 to require this file was provided by Bundler, particularly the `require
@@ -67,7 +77,7 @@ We've spent a lot of our time so far in the `railties` gem and some other time
 in our application. Now it's time to start looking at a new gem: the
 `actionpack` gem.
 
-=== [actionpack gem]/lib/action_dispatch.rb
+==== [actionpack gem]/lib/action_dispatch.rb
 
 This file is responsible for setting up the Action Dispatch component of
 Rails. The Action Dispatch component is responsible for handling requests that
@@ -219,7 +229,9 @@ On my machine, this is what that code returns:
 => "/Users/ryanbigg/.gem/ruby/2.2.2/gems/rack-1.6.0/lib"
 ----
 
-Let's open up that Rack gem in our editor now and take a look at `rack.rb`. It's pretty well commented to start with. The constants may seem a bit weird at first:
+Let's open up that Rack gem in our editor now and take a look at `rack.rb`.
+It's pretty well commented to start with. The constants may seem a bit weird
+at first:
 
 [source, ruby]
 .[rack gem]/lib/rack.rb
@@ -246,15 +258,252 @@ about these calls is that they specify a path. **This is because Ruby has
 built-in autoloading features.** [footnote: Read about `Kernel#autoload` here:
 http://ruby-doc.org/core-2.2.2/Kernel.html#method-i-autoload]. Rack is using
 this built-in `autoload` method, instead of the one Active Support provides.
+The one that Active Support provides is only enabled on a class or module by
+way of having that class or module extended by `ActiveSupport::Autoload`. We
+can see this happening when the `ActiveSupport` module is first defined:
 
+[source, ruby]
+[active support gem]/lib/active_support.rb
+----
+module ActiveSupport
+  extend ActiveSupport::Autoload
+----
 
+Extending `ActiveSupport` with `ActiveSupport::Autoload` adds the `autoload`
+method override (and friends) to `ActiveSupport`. However, when the `Rack`
+module is defined, there is no such extension happening. Therefore we know
+that `Rack` is using Ruby's built-in autoloading instead of ActiveSupport's;
+an important distinction to make so that we know if it's Ruby or Active
+Support which is doing the autoloading in the future.
 
+Now to look at the remainder of `action_dispatch.rb`. Let's start with the
+first `eager_autoload` block:
 
+[source, ruby]
+----
+eager_autoload do
+  autoload_under 'http' do
+    autoload :Request
+    autoload :Response
+  end
+end
+----
 
+The `eager_autoload` method defines things that are eager autoloaded, surprise
+surprise. Without using technical jargon, these are constants which are loaded
+when `Rails.application.config.eager_load` is set to true in our environment's
+configuration. Eager loading is disabled in development and test, but enabled
+in production. You can see this by looking at the `config/environments/*.rb`
+files in the application. Each of them, by default, will configure this
+`eager_load` configuration setting.
 
+The `autoload_under` method simply specifies a path where the constants can be
+found. Without this block, the code will attempt to load the files from
+`[action dispatch gem]/lib/action_dispatch/request.rb`, and `[action dispatch
+gem]/lib/action_dispatch/response.rb`. With the `autoload_under` method, it
+will attempt to load them from the correct path: `[action dispatch
+gem]/lib/action_dispatch/http`. This separation enables Rails to separate out
+the files into a separate directory in the path, but still keep the constants
+as simply `ActionDispatch::Request` and `ActionDispatch::Response`, instead of `ActionDispatch::HTTP::Request`.
 
+Knowing all that we know now, we can read through the remainder of this file
+with relative ease. There's one line amongst all the autoloading which stands
+out, and it's this one:
 
+[source, ruby]
+----
+mattr_accessor :test_app
+----
 
+This line defines an accessor for the `ActionDispatch` module called
+`test_app`. This is the Rack-ish app that will be used for requests in tests.
+
+The final couple of lines add some `on_load` hooks for `ActionView`:
+
+[source, ruby]
+----
+autoload :Mime, 'action_dispatch/http/mime_type'
+
+ActiveSupport.on_load(:action_view) do
+  ActionView::Base.default_formats ||= Mime::SET.symbols
+  ActionView::Template::Types.delegate_to Mime
+end
+----
+
+The `autoload` here is outside the context of the `ActionDispatch` module, and
+so this constant is autoloaded at the root level, as a constant called `Mime`.
+The `on_load` hook uses this constant to define some default formats for
+`ActionView::Base.default_formats`. 
+
+What is an Action View hook doing in Action Dispatch? Well, we can see here
+it's depending on the `Mime` constant that comes from ActionDispatch.
+
+That completes the description for `action_dispatch.rb`. Let's move on to the second line that we've covering in this chapter, `rails.rb`.
+
+=== Rails, or more particularly, `rails.rb`
+
+Or more particularly than than: `[railties gem]/lib/rails.rb`.
+
+[source, ruby]
+.[railties gem]/lib/rails.rb
+----
+require 'rails/ruby_version_check'
+
+require 'pathname'
+
+require 'active_support'
+require 'active_support/dependencies/autoload'
+require 'active_support/core_ext/kernel/reporting'
+require 'active_support/core_ext/module/delegation'
+require 'active_support/core_ext/array/extract_options'
+----
+
+This file starts off by requiring `ruby_version_check` just to make ultra-
+ultra sure that we're running a valid version of Ruby. The next bunch of
+requires require `pathname` which brings in the very helpful `Pathname`
+constant which is used for file or directory names, and manipulation thereof.
+
+The remaining requires in that little snippet from this file require
+`active_support` and `active_support/dependencies/autoload` which we know have
+already been required. The `core_ext` files have good documentation
+themselves, so we won't be diving into them here[footnote: Remember you can
+also check out the Active Support Core Extensions Guide:
+http://guides.rubyonrails.org/active_support_core_extensions.html]
+
+The next require in this file is for `rails/application`. Let's take a look.
+
+==== [railties gem]/lib/rails/application.rb
+
+This file the heart and soul of every Rails application. The comments here are
+very useful, particularly the part about the boot process, reproduced here:
+
+1. require `config/boot.rb` to setup load paths
+2. require railties and engines
+3. Define `Rails.application` as `class MyApp::Application < Rails::Application`
+4. Run `config.before_configuration` callbacks
+5. Load `config/environments/ENV.rb`
+6. Run `config.before_initialize` callbacks
+7. Run `Railtie#initializer` defined by railties, engines and application. One by one, each engine sets up its load paths, routes and runs its `config/initializers/*` files.
+8. Custom `Railtie#initializers` added by railties, engines and applications are executed.
+9. Build the middleware stack and run `to_prepare` callbacks
+10. Run `config.before_eager_load` and `eager_load!` if `eager_load` is true
+11. Run `config.after_initialize` callbacks
+
+Spoilers: we'll be going through all this as our Rails application initializes
+itself in preparation for serving requests. For now, we're going to look
+through these fiels so we can get a high-level overview of what's being loaded.
+
+As per usual, let's start our sleuthing at the top of the file and work our way through it:
+
+.[railties gem]/lib/rails/application.rb
+[source, ruby]
+----
+require 'fileutils'
+require 'active_support/core_ext/hash/keys'
+require 'active_support/core_ext/object/blank'
+require 'active_support/key_generator'
+require 'active_support/message_verifier'
+require 'rails/engine'
+----
+
+This file starts out by requiring `fileutils`, a couple of core extensions and
+two new files: `active_support/key_generator` and
+`active_support/message_verifier`. The docs for both
+`ActiveSupport::KeyGenerator`[footnote: `ActiveSupport::KeyGenerator`
+http://devdocs.io/rails/activesupport/keygenerator] and
+`ActiveSupport::MessageVerifier`[footnote: `ActiveSupport::MessageVerifier`:
+http://devdocs.io/rails/activesupport/messageverifier] explain their purposes
+well enough that this book doesn't need to. Suffice to say: they're a big part
+of the built-in security of Rails.
+
+The final `require` in the above example is for `rails/engine`. If we look a
+couple of lines down from this `require`, we'll see this text:
+
+> In Rails 3.0, a `Rails::Application` object was introduced which is nothing
+> more than an `Engine` but with the responsibility of coordinating the whole
+> boot process.
+
+This might be revelatory for some of those who are reading this book: an
+application is itself an engine! That's pretty neat.
+
+Let's now take a look at that `rails/engine` file.
+
+==== [railties gem]/lib/rails/engine.rb
+
+As `Rails::Application` is the heart and soul of every Rails application,
+`Rails::Engine` is the heart and soul of every engine. The documentation for
+this class is well worth a read. Let's cover a few interesting points now.
+
+===== Configuring Generators
+
+The `config.generators` method allows you to configure which generators are used for engines, and by extensions applications too:
+
+[source, ruby]
+----
+class MyEngine < Rails::Engine
+  config.generators do |g|
+    g.orm             :active_record
+    g.template_engine :erb
+    g.test_framework  :test_unit
+  end
+end
+----
+
+The documentation shows the default values for these options. If you wanted to
+use Haml for the templating language instead of ERB, you would specify here
+`g.template_engine :haml`. Similarly, if you wanted to use RSpec instead of
+Test::Unit, you would specify `g.test_framework :rspec`. These options would
+tell the engine (or application) to use those generators instead of the
+default ones.
+
+It's worth mentioning also that you can use `app_generators` within an engine to configure which generators are used by the application:
+
+[source, ruby]
+----
+class MyEngine < Rails::Engine
+  # note that you can also pass block to app_generators in the same way you
+  # can pass it to generators method
+  config.app_generators.orm :datamapper
+end
+----
+
+Typically you wouldn't do this though, because engines are supposed to
+*extend* the application's behaviour, and shouldn't be used to modify it.
+That's because you can't be certain that the application hasn't already
+decided which setting it would like for a particular generator. Therefore,
+only do this when you absolutely know it's the right thing to do.
+
+===== Paths
+
+The next part of the `Rails::Engine` documentation shows how to configure
+paths. This part is only mentioned here in the book because **you should never
+ever ever ever do what this documentation recommends**. Well, I mean, you
+could do this if you wanted to annoy your co-workers, but generally there is
+no good reason to configure paths like this within a Rails application or
+engine.
+
+Don't use this feature.
+
+===== Configuring an endpoint
+
+The next thing mentioned in the documentation for `Rails::Engine` is that you
+can define a Rack endpoint for this engine. The example it gives is this:
+
+[source, ruby]
+----
+module MyEngine
+  class Engine < Rails::Engine
+    endpoint MyRackApplication
+  end
+end
+----
+
+This is particularly useful if you want to add in some initializer hooks
+before your Rack endpoint boots, or anything similar to that. What this does
+is override the `endpoint` for the engine, which would typically be the routes
+for the engine (defined at `[engine root]/config/routes.rb`). Rather than
+using those routes, the engine will now route requests to that Rack
+application.
 
 
 
