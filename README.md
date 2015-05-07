@@ -10,7 +10,7 @@ To generate this book, install the bundle:
 
 To generate the book, pick a format and run the appropriate rake command:
 
-    asciidoctor book.ad
+    asciidoctor book.adoc
     rake init:html
     rake init:epub
     rake init:mobi

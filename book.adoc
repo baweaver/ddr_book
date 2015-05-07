@@ -3,9 +3,9 @@
 :toc: right
 :toclevels: 2
 
-include::preface.ad[]
+include::preface.adoc[]
 
 :numbered:
 
-include::ch01/ch01.ad[]
-include::ch02/ch02.ad[]
+include::ch01/ch01.adoc[]
+include::ch02/ch02.adoc[]

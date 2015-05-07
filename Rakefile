@@ -21,7 +21,7 @@ end
 
 def book_file
   # The version of the book with syntax highlighting turned on
-  "book-highlights.ad"
+  "book-highlights.adoc"
 end
 
 def formats
