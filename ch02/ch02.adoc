@@ -52,7 +52,7 @@ Before we call `require 'bundler/setup'` there are 12 paths in `$LOAD_PATH`.
 on my machine. Yours might be slighty different, depending on how Ruby is
 setup. After we require  `bundler/setup`, all those gems that Bundler has
 resolved to be dependencies of our application will be added to the
-`$LOAD_PATH`. 
+`$LOAD_PATH`.
 
 When we require `action_dispatch` (for example), this will load the file
 contained in one of these gems called `action_dispatch.rb`. It is safe to
@@ -69,7 +69,7 @@ $:.detect do |p|
 end
 ----
 
-In my `irb` session, this code tells me that the path is located at 
+In my `irb` session, this code tells me that the path is located at
 
 ----
 "/Users/ryanbigg/.gem/ruby/2.2.2/gems/actionpack-4.2.1/lib"
@@ -83,7 +83,7 @@ in our application. Now it's time to start looking at a new gem: the
 
 This file is responsible for setting up the Action Dispatch component of
 Rails. The Action Dispatch component is responsible for handling requests that
-are arriving in our server. 
+are arriving in our server.
 
 ==== ActiveSupport bootstrapping
 
@@ -152,6 +152,7 @@ later.
 Going back to `action_dispatch.rb`, there's still two `require` calls for
 Active Support stuff that we haven't covered yet:
 
+[source, ruby]
 ----
 require 'active_support/rails'
 require 'active_support/core_ext/module/attribute_accessors'
@@ -161,6 +162,7 @@ The `active_support/rails` line requires some very basic things that will be
 used throughout many of the files we will look at. Let's have a quick look at
 what's defined. The comments in that file are quite descriptive:
 
+[source, ruby]
 ----
 # Defines Object#blank? and Object#present?.
 require 'active_support/core_ext/object/blank'
@@ -265,7 +267,7 @@ way of having that class or module extended by `ActiveSupport::Autoload`. We
 can see this happening when the `ActiveSupport` module is first defined:
 
 [source, ruby]
-[active support gem]/lib/active_support.rb
+.[active support gem]/lib/active_support.rb
 ----
 module ActiveSupport
   extend ActiveSupport::Autoload
@@ -335,7 +337,7 @@ end
 The `autoload` here is outside the context of the `ActionDispatch` module, and
 so this constant is autoloaded at the root level, as a constant called `Mime`.
 The `on_load` hook uses this constant to define some default formats for
-`ActionView::Base.default_formats`. 
+`ActionView::Base.default_formats`.
 
 What is an Action View hook doing in Action Dispatch? Well, we can see here
 it's depending on the `Mime` constant that comes from ActionDispatch.
