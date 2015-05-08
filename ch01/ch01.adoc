@@ -43,7 +43,7 @@ You're probably already familiar with that output -- or something very similar
 to it -- already. Of course when we go to http://localhost:3000 in our browser
 we'll see the very familiar "Welcome Aboard" page.
 
-image::ch01/images/welcome_aboard.png[]
+image::images/welcome_aboard.png[]
 
 How does this command work? We can find out on any UNIX system by running the
 `which` command:

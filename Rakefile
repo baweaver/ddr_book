@@ -11,6 +11,10 @@ def output_path(format = :html)
   build_path + format.to_s
 end
 
+def output_images_path(format = :html)
+  output_path(format) + "images"
+end
+
 def output_file(format = :html, ext = :html)
   output_path(format) + output_filename(ext)
 end
@@ -35,41 +39,41 @@ namespace :init do
     end
   end
 
-  task :build, [:format, :ext, :command, :extra_args, :copy_images] => :prepare do |t, args|
+  task :build, [:format, :ext, :command, :extra_args, :cleanup_images] => :prepare do |t, args|
     puts "Creating #{args[:format]} book"
+
+    target = output_images_path(args[:format])
+    FileUtils.mkdir_p(target)
+    Dir[project_path + "ch*/images/**/*"].each do |source|
+      FileUtils.cp(source, target)
+    end
+
     system("bundle", "exec", args[:command], book_file,
            "-D", output_path(args[:format]).to_s, "-o", output_filename(args[:ext]).to_s,
            "-B", project_path.to_s,
            *args[:extra_args].split(" "))
-    if args[:copy_images]
-      Dir[project_path + "ch*/images/**/*"].each do |source|
-        target = source.gsub(project_path.to_s, output_path(args[:format]).to_s)
-        FileUtils.mkdir_p(File.dirname(target))
-        FileUtils.cp(source, target)
-      end
+
+    if args[:cleanup_images]
+      FileUtils.rm_r(output_images_path(args[:format]))
     end
     puts "#{args[:format]} book created in #{output_file(args[:format], args[:ext])}"
   end
 
   desc 'Build HTML format'
   task :html do
-    Rake::Task["init:build"].invoke("html", "html", "asciidoctor", "", true)
+    Rake::Task["init:build"].invoke("html", "html", "asciidoctor", "")
   end
 
   task :pdf do
-    Rake::Task["init:build"].invoke("pdf", "pdf", "asciidoctor-pdf", "")
+    Rake::Task["init:build"].invoke("pdf", "pdf", "asciidoctor-pdf", "-a imagesdir=build/pdf", true)
   end
 
   task :epub do
-    Rake::Task["init:build"].invoke("epub", "epub", "asciidoctor-epub3", "")
+    Rake::Task["init:build"].invoke("epub", "epub", "asciidoctor-epub3", "-a imagesdir=build/epub", true)
   end
 
   task :mobi do
-    Rake::Task["init:build"].invoke("mobi", "mobi", "asciidoctor-epub3", "-a ebook-format=kf8")
-  end
-
-  task :docbook do
-    Rake::Task["init:build"].invoke("docbook", "xml", "asciidoctor", "-b dockbook")
+    Rake::Task["init:build"].invoke("mobi", "mobi", "asciidoctor-epub3", "-a ebook-format=kf8 -a imagesdir=build/mobi", true)
   end
 
   task :all => formats do
