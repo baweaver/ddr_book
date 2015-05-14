@@ -477,7 +477,7 @@ That's because you can't be certain that the application hasn't already
 decided which setting it would like for a particular generator. Therefore,
 only do this when you absolutely know it's the right thing to do.
 
-===== Paths
+==== Paths
 
 The next part of the `Rails::Engine` documentation shows how to configure
 paths. This part is only mentioned here in the book because **you should never
@@ -527,7 +527,255 @@ end
 ----
 
 When a request comes into the engine, it will be routed first through this
-middleware. Requests going through the application won't be routed this way.
+middleware. Requests going through the application won't be routed through the
+engine, and so they won't be routed through this middleware either.
+
+==== Moving on from engines
+
+The remainder of the documentation in `rails/engine.rb` is well-worth a read
+and explains the other parts of `Rails::Engine` in a very neat fashion. The
+http://guides.rubyonrails.org/engines.html[Engines Guide] is also a good read.
+I should know; I wrote the first edition of it.
+
+Let's dive further down the stack now and look at what `Rails::Railtie` loads.
+
+=== [railties gem]/lib/rails/railtie.rb
+
+Railties, as the documentation says, are the core of the Rails framework. The
+`Rails::Railtie` class is where both `Rails::Engine` and `Rails::Application`
+(by extension) get some of their features from. The Railties you love and know
+are Action Mailer, Action Controller, Action View and Active Record. Each of
+these define their own tie into Rails and we'll see these in due time when we
+get to them.
+
+Let's take a look at the start of this file and what it's loading:
+
+[source, ruby]
+----
+require 'rails/initializable'
+require 'rails/configuration'
+----
+
+The `rails/initializable` file defines the initializer features that Railties,
+Engines and Applications all use. The `rails/configuration` file defines the
+configuration features that all of those use too. 
+
+These two files are critical to providing features that `Rails::Engine` uses when it defines initializers like these:
+
+[source, ruby]
+----
+initializer :set_load_path, before: :bootstrap_hook do
+  _all_load_paths.reverse_each do |path|
+    $LOAD_PATH.unshift(path) if File.directory?(path)
+  end
+  $LOAD_PATH.uniq!
+end
+
+# Set the paths from which Rails will automatically load source files,
+# and the load_once paths.
+#
+# This needs to be an initializer, since it needs to run once
+# per engine and get the engine as a block parameter
+initializer :set_autoload_paths, before: :bootstrap_hook do
+  ActiveSupport::Dependencies.autoload_paths.unshift(*_all_autoload_paths)
+  ActiveSupport::Dependencies.autoload_once_paths.unshift(*_all_autoload_once_paths)
+
+  # Freeze so future modifications will fail rather than do nothing mysteriously
+  config.autoload_paths.freeze
+  config.eager_load_paths.freeze
+  config.autoload_once_paths.freeze
+end
+----
+
+The `initializer` method is provided by `rails/initializable`, and the
+`config` method is provided by `rails/configuration`. We'll go through these
+when Rails runs these initializers. All that has happened by the point that
+`rails/engine.rb` has been required and the initializers have been defined.
+
+=== Where to from here?
+
+We've now reached the end of this particular chain of files. We've looked at
+`rails/application.rb`, `rails/engine.rb` and `rails/railtie.rb` and learned
+how railties are railties, engines are railties, and applications are engines
+and railties.
+
+We were up to this line in `rails.rb` right before we went off and did our deep dive into applications, engines and railties:
+
+[source, ruby]
+----
+require 'rails/application'
+----
+
+Let's now keep looking through this same file. The next file that's required
+is `rails/version`, which serves a similar purpose to the
+`action_dispatch/version.rb` and `action_pack/version.rb` files that have
+already been required. That purpose is that it defines a `version` method on
+the `Rails` module so that we can easily see what version of Rails we're
+using.
+
+It's time to go back to the file that kicked off this deep exploration:
+`rails.rb`. It's time to look into the first two non-application/non-engine
+railties that Rails uses.
+
+== The Active Support and Action Dispatch Railties
+
+The next two lines in `[railties gem]/lib/rails.rb` require these two files:
+
+[source, ruby]
+----
+require 'active_support/railtie'
+require 'action_dispatch/railtie'
+----
+
+These files (and the files they require) are responsible for defining the first _three_ Railties in our application. Let's go through what these are now.
+
+=== [activesupport gem]/lib/active_support/railtie.rb
+
+This file starts out by requiring these two lines:
+
+[source, ruby]
+----
+require "active_support"
+require "active_support/i18n_railtie"
+----
+
+We'll get to the `i18n_railtie` in just a moment.
+
+The next couple of lines in this file go like this:
+
+[source, ruby]
+----
+module ActiveSupport
+  class Railtie < Rails::Railtie # :nodoc:
+    config.active_support = ActiveSupport::OrderedOptions.new
+----
+
+Where is that `config` method coming from? It's coming from this line in `[railties gem]/lib/rails/railtie.rb`:
+
+[source, ruby]
+----
+delegate :config, to: :instance
+----
+
+The `delegate` method is provided by this core extension required at the top of that file:
+
+[source, ruby]
+----
+require 'active_support/core_ext/module/delegation'
+----
+
+What it does is it lets us delegate a method call to some other method call. In this case, when we call `config` it will delegate the method to `instance`. This is identical to as if the `config` method was defined like:
+
+[source, ruby]
+----
+def config
+  instance.config
+end
+----
+
+The `instance` method is also from `[railties gem]/lib/rails/railtie.rb`:
+
+[source, ruby]
+----
+def instance
+  @instance ||= new
+end
+----
+
+As we can see from the method, this will initialize a new instance of the
+class in question and memoize that as an instance variable called `@instance`.
+Every time the `instance` method is called on this class, we will get the same
+instance of that class.
+
+The `config` method is also defined within `[railties gem]/lib/rails/railtie.rb`, as an instance method on `Rails::Railtie`:
+
+[source, ruby]
+----
+def config
+  @config ||= Railtie::Configuration.new
+end
+----
+
+The `Railtie::Configuration` class is defined by this `autoload` call just inside `Rails::Railtie`:
+
+[source, ruby]
+----
+autoload :Configuration, "rails/railtie/configuration"
+----
+
+Going back to this code now:
+
+[source, ruby]
+----
+module ActiveSupport
+  class Railtie < Rails::Railtie # :nodoc:
+    config.active_support = ActiveSupport::OrderedOptions.new
+----
+
+We now know where that `config` method is coming from, but where is that
+`active_support` method coming from? Well, we know that `config` is an
+instance of `Railtie::Configuration`, so let's look in that class.
+
+Looking at the very bottom of that class, we'll see a `method_missing` is defined:
+
+[source, ruby]
+----
+def method_missing(name, *args, &blk)
+  if name.to_s =~ /=$/
+    @@options[$`.to_sym] = args.first
+  elsif @@options.key?(name)
+    @@options[name]
+  else
+    super
+  end
+end
+----
+
+The `active_support=` method call is being caught by this `method_missing`.
+When `method_missing` is called, the name of the method is passed to it as a
+Symbol. Therefore, we know that `name` in this case will be
+`:active_support=`. We know that the method ends in `=`, so the `if` in this
+method will be the path in the code that will be taken.
+
+Since nobody can remember what the `$<anything>` in Ruby does without having
+to look it up a bajillion times before it sticks footnote:[Or is that just me?], let's see what this `$\`
+does in irb:
+
+[source, ruby]
+----
+name = :active_support=
+name.to_s =~ /=$/
+$`
+----
+
+In my irb (and probably yours too) this outputs "active_support". Therefore we can know that this line:
+
+[source, ruby]
+----
+@@options[$`.to_sym] = args.first
+----
+
+Is going to be this:
+
+[source, ruby]
+----
+@@options[:active_support] = args.first
+----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
