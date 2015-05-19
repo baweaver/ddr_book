@@ -38,8 +38,10 @@ namespace :init do
   task :build, [:format, :ext, :command, :extra_args, :copy_images] => :prepare do |t, args|
     puts "Creating #{args[:format]} book"
     system("bundle", "exec", args[:command], book_file,
-           "-D", output_path(args[:format]).to_s, "-o", output_filename(args[:ext]).to_s,
+           "-D", output_path(args[:format]).to_s, 
+           "-o", output_filename(args[:ext]).to_s,
            "-B", project_path.to_s,
+           "-a", "stylesheet=stylesheets/init.css",
            *args[:extra_args].split(" "))
     if args[:copy_images]
       Dir[project_path + "ch*/images/**/*"].each do |source|
@@ -53,6 +55,7 @@ namespace :init do
 
   desc 'Build HTML format'
   task :html do
+    `scss stylesheets/init.scss stylesheets/init.css`
     Rake::Task["init:build"].invoke("html", "html", "asciidoctor", "", true)
   end
 

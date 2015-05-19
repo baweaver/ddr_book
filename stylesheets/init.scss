@@ -1,0 +1,40 @@
+/* Asciidoctor default stylesheet | MIT License | http://asciidoctor.org */
+/* Remove the comments around the @import statement below when using this as a custom stylesheet */
+@import "https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700";
+
+$code-size: 85%;
+$dark-grey: #232323;
+
+body {
+  margin: 0 15%;
+  font: 14pt "Source Sans Pro";
+  color: $dark-grey;
+}
+
+a:visited {
+  color: blue;
+}
+
+img {
+  width: 100%;
+}
+
+p > code {
+  background: #f8f8f8;
+  font-size: $code-size;
+  white-space: nowrap;
+}
+
+.listingblock {
+  .title {
+    font-weight: bold;
+    border-bottom: 1px dashed $dark-grey;
+    padding-bottom: 3px;
+  }
+}
+
+.pygments {
+  overflow: auto;
+  padding: 20px;
+  font-size: $code-size;
+}
