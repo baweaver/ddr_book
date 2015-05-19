@@ -71,6 +71,7 @@ end
 
 In my `irb` session, this code tells me that the path is located at 
 
+[source, text]
 ----
 "/Users/ryanbigg/.gem/ruby/2.2.2/gems/actionpack-4.2.1/lib"
 ----
@@ -152,6 +153,7 @@ later.
 Going back to `action_dispatch.rb`, there's still two `require` calls for
 Active Support stuff that we haven't covered yet:
 
+[source, ruby]
 ----
 require 'active_support/rails'
 require 'active_support/core_ext/module/attribute_accessors'
@@ -161,6 +163,7 @@ The `active_support/rails` line requires some very basic things that will be
 used throughout many of the files we will look at. Let's have a quick look at
 what's defined. The comments in that file are quite descriptive:
 
+[source, ruby]
 ----
 # Defines Object#blank? and Object#present?.
 require 'active_support/core_ext/object/blank'
@@ -227,6 +230,7 @@ end
 
 On my machine, this is what that code returns:
 
+[source, text]
 ----
 => "/Users/ryanbigg/.gem/ruby/2.2.2/gems/rack-1.6.0/lib"
 ----
@@ -265,7 +269,7 @@ way of having that class or module extended by `ActiveSupport::Autoload`. We
 can see this happening when the `ActiveSupport` module is first defined:
 
 [source, ruby]
-[active support gem]/lib/active_support.rb
+.[active support gem]/lib/active_support.rb
 ----
 module ActiveSupport
   extend ActiveSupport::Autoload
@@ -738,8 +742,8 @@ Symbol. Therefore, we know that `name` in this case will be
 method will be the path in the code that will be taken.
 
 Since nobody can remember what the `$<anything>` in Ruby does without having
-to look it up a bajillion times before it sticks footnote:[Or is that just me?], let's see what this `$\`
-does in irb:
+to look it up a bajillion times before it sticks footnote:[Or is that just
+me?], let's see what this `$\` does in irb:
 
 [source, ruby]
 ----
@@ -748,7 +752,8 @@ name.to_s =~ /=$/
 $`
 ----
 
-In my irb (and probably yours too) this outputs "active_support". Therefore we can know that this line:
+In my irb (and probably yours too) this outputs "active_support". Therefore we
+can know that this line:
 
 [source, ruby]
 ----
@@ -762,24 +767,39 @@ Is going to be this:
 @@options[:active_support] = args.first
 ----
 
+Therefore we know that `config.active_support=` is going to set an option for
+the `ActiveSupport::Railtie`. This option is used later. 
 
+The remainder of the railtie defines initializers which we won't cover yet
+because they're only being defined here, and not ran.
 
+Let's move on to looking at the Action Dispatch railtie.
 
+=== [actionpack gem]/lib/action_dispatch/railtie.rb
 
+This file starts out by defining a class which also inherits from `Rails::Railtie`, and it defines a lot of configuration options:
 
+[source, ruby]
+----
+module ActionDispatch
+  class Railtie < Rails::Railtie # :nodoc:
+    config.action_dispatch.x_sendfile_header = nil
+    config.action_dispatch.ip_spoofing_check = true
+    config.action_dispatch.show_exceptions = true
+    config.action_dispatch.tld_length = 1
+    config.action_dispatch.ignore_accept_header = false
+    config.action_dispatch.rescue_templates = { }
+    config.action_dispatch.rescue_responses = { }
+    config.action_dispatch.default_charset = nil
+    config.action_dispatch.rack_cache = false
+    config.action_dispatch.http_auth_salt = 'http authentication'
+    config.action_dispatch.signed_cookie_salt = 'signed cookie'
+    config.action_dispatch.encrypted_cookie_salt = 'encrypted cookie'
+    config.action_dispatch.encrypted_signed_cookie_salt = 'signed encrypted cookie'
+    config.action_dispatch.perform_deep_munge = true
+----
 
+A lot of these configuration options are interesting:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+* `ip_spoofing_check` protects you against IP spoofing attacks, where someone may forge an `X-Forwarded-For` header to pretend like the request is served from somewhere it's not. There's more information in this blog post: http://blog.gingerlime.com/2012/rails-ip-spoofing-vulnerabilities-and-protection/ and there is a significant amount of documentation about this in the `ActionDispatch::RemoteIp` class.
+* `show_exceptions` determines whether or not to show an exception. In development, this determines whether the detailed exception page should be displayed. In production, this will determine if Rails itself should handle the exception or if it should be handled by the layer above Rails. This layer will respond with an Internal Server Error with the text of the exception.
