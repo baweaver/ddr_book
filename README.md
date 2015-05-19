@@ -1,6 +1,10 @@
 # The Rails Initialization Process
 
-This book walks through from Go-to-Woah for the Rails initialization process, starting at "rails server" and finishing up with a request being served through a controller to render a view.
+This book walks through from Go-to-Woah for the Rails initialization process,
+starting at "rails server" and finishing up with a request being served
+through a controller to render a view.
+
+A work in progress.
 
 ## Generating from AsciiDoc
 
@@ -16,6 +20,8 @@ To generate the book, pick a format and run the appropriate rake command:
     rake init:mobi
     rake init:pdf
 
+There's some rudimentary stylesheeting going on in `stylesheets`. If
+anything's formatted weird, that's the place you should look.
 
 ## Contributing
 
@@ -25,4 +31,4 @@ Contributions to this book are done via GitHub Issues and Pull Requests. If you 
 2. The text around the issue so that we can locate it
 3. Any other info you deem necessary
 
-If you want to submit a Pull Request to fix this issue, all the better! AsciiDoc isn't as bad as [some formats](http://www.docbook.org/)
+If you want to submit a Pull Request to fix this issue, all the better! AsciiDoc isn't as bad as [some formats](http://www.docbook.org/). Don't be afraid to jump in!
