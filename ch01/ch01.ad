@@ -53,8 +53,8 @@ which rails
 ----
 
 The `which` utility will tell us where a program lives in the user's `$PATH`.
-If you're on Windows, you probably have something like this but we're not
-Windows users, so you'll have to figure that out yourself.
+If you're on Windows, you can use powershell's `where.exe` to achieve a similar
+result.
 
 On my machine, this prints out this:
 
@@ -69,7 +69,7 @@ is ultimately important is what's inside that file.
 
 === [somewhere]/bin/rails
 
-Let's open this file now and see:
+Let's open this file and see:
 
 [source, ruby]
 .[somewhere]/bin/rails
@@ -99,18 +99,18 @@ gem 'railties', version
 load Gem.bin_path('railties', 'rails', version)
 ----
 
-This file is an executable and uses the shebang footnote:[Bash Shebang:
+This file is an executable that uses the shebang footnote:[Bash Shebang:
 http://en.wikipedia.org/wiki/Shebang_%28Unix%29] to parse the remainder of the
 program through a Ruby interpreter. Without this line, it would be interpreted
 as whatever shell scripting language you're using. That's probably going to be
 Bash unless you're one of those hipster types that use zsh.
 
-The next non-commented thing in this file is a require to `rubygems`. This
-provides us with the RubyGem classes + methods which are used later on this
+The next non-commented line in this file is a require to `rubygems`. This
+provides us with the RubyGem classes and methods, which are used later on this
 file.
 
 After that, there's a bit of a dance in order to determine if we've specified
-a version for this `rails` command. What this `if ARGV.first` code does is
+a version for this `rails` command. What `if ARGV.first` does is
 enable this feature:
 
 ----
@@ -118,14 +118,11 @@ rails _4.2.0_ new app
 ----
 
 It allows you to load a _different_ version of Rails and run that instead of
-whatever RubyGems would pick up by default. The code checks to see if the
-first argument (`ARGV.first`) matches this regular expression: `/\A_(.*)_\z/`.
-If it does, _and_ if that looks like a "correct" version according to RubyGems
-footnote:[For what RubyGems considers a "correct" version number, read these
-code comments from `Gem::Version`: http://git.io/vfs0Y], that version is used
-for what comes next.
-
-What comes next is these two lines which really kickstart the whole process:
+the default. The code checks if the irst argument (`ARGV.first`) matches the
+regular expression: `/\A_(.*)_\z/`. If it does, _and_ if that looks like a
+"correct" version according to RubyGems footnote:[For what RubyGems considers
+a "correct" version number, read these code comments from `Gem::Version`:
+http://git.io/vfs0Y], that version is used to kickstart the whole process:
 
 [source, ruby]
 ----
@@ -133,10 +130,10 @@ gem 'railties', version
 load Gem.bin_path('railties', 'rails', version)
 ----
 
-If `version` has been specified, then that version of the `railties` gem will
+If `version` has been specified, that version of the `railties` gem will
 be loaded. The final line in this file looks in the `bin` path of the specific
 version of the `railties` gem and loads the `rails` script. We can find what
-script that's finding by running this command:
+script that's getting by running this command:
 
 [source, bash]
 ----
@@ -156,7 +153,7 @@ Let's look at what this file does.
 
 === [railties gem]/bin/rails
 
-The contents of this file are this:
+The contents of this file are:
 
 [source, ruby]
 ----
@@ -171,19 +168,19 @@ end
 require "rails/cli"
 ----
 
-This file first checks to see if there's a `.git` directory three directories
+This file checks to see if there's a `.git` directory three directories
 up from the path where this file is. There would only be a `.git` directory if
 we were attempting to use this file in a cloned version of Rails. In this
-case, the `railties` gem might not be in the `$LOAD_PATH` already or if it is,
+case, the `railties` gem might not be in the `$LOAD_PATH` already. If it is,
 it might be a different version to the one in the repo. The code inside the
-`if` here adds the `lib` directory to the beginning of the `$LOAD_PATH` using
+`if` adds the `lib` directory to the beginning of the `$LOAD_PATH` using
 its shorthand variant of `$:` and `unshift`. footnote:[The code inside the
-`if` is not ran in a typical Rails application, but is still worth covering
+`if` is not run in a typical Rails application, but is still worth covering
 for those who are curious to know what it does.]
 
-The final line in this file requires the file `rails/cli`. The code above it
-can give us some indication of where we might find it: in the `railties` gem
-itself. Indeed, that is where it is. Let's move over to that file now.
+The final line in this file requires the file `rails/cli`. The code above
+gives us some indication of where we will find it: the `railties` gem
+itself. Let's move over to that file now.
 
 === [railties gem]/lib/rails/cli.rb
 
@@ -194,7 +191,7 @@ The contents of this file are:
 ----
 require 'rails/app_rails_loader'
 
-# If we are inside a Rails application this method performs an exec and thus
+# If we are inside a Rails application this method performs an exec and
 # the rest of this script is not run.
 Rails::AppRailsLoader.exec_app_rails
 
@@ -209,10 +206,12 @@ else
 end
 ----
 
-The first line of this file requires `rails/app_rails_loader`, and the second
-line runs a method called `Rails::AppRailsLoader.exec_app_rails` which would
-seem like it has been defined in that file based on the similarity of the
-class name and the filename. As the comment says, if we're inside a Rails
+The first line requires `rails/app_rails_loader`, and the second
+runs a method called `Rails::AppRailsLoader.exec_app_rails` which looks
+like it has been defined based on the similarity of the
+class name and file name.
+
+As the comment says, if we're inside a Rails
 application this is where this file stops and `exec_app_rails` takes over.
 We'll get to that in a minute. Let's see what the rest of the file has for us first.
 
@@ -237,12 +236,12 @@ end
 ----
 
 The code here checks the `RUBY_VERSION` constant defined by the Ruby
-interpreter that we're using. If that is less than Ruby 1.9.3, this file will
+interpreter we're using. If it is less than Ruby 1.9.3, this file will
 abort the process using the `abort` method. The message it will abort with is
 everything between `<<-end_message` and its counterpart, `end_message`; a
 Heredoc.
 
-This is done because there is some code in Rails which just isn't compatible
+This is done because Rails isn't fully compatible
 with earlier versions. Ruby 1.9.1 and Ruby 1.9.2 have been known to have
 issues, and so the Rails Core Team have decided to only support Ruby 1.9.3 and
 above.
@@ -272,15 +271,15 @@ else
 end
 ----
 
-The `Signal.trap` method here will trap an `INT` signal; typically issued by
-`Command+C` or `Control+C` shortcuts. If that code encounters one of these
-signals, it will `exit` with a code of `1`, indicating that the process didn't
+The `Signal.trap` method will trap an `INT` signal; typically issued by
+`Command+C` or `Control+C` shortcuts. If that signal is encountered,
+it will `exit` with a code of `1`, indicating that the process didn't
 run correctly.
 
-The final lines for this file check if the first argument provided to the
-`rails` command is "plugin". If that's the case, it will require
+The final lines check if the first argument provided to the
+`rails` command is "plugin". If so, it will require
 `rails/commands/plugin`. This would happen if you were to run the command
-`rails plugin new`, for example. If the argument isn't "plugin" then it's
+`rails plugin new`. If the argument isn't "plugin" then it's
 assumed you want to do something with the application, and
 `rails/commands/application` is loaded instead.
 
@@ -291,7 +290,7 @@ that we first saw required at the top of `rails/cli.rb`: `rails/app_rails_loader
 
 === [railties gem]/lib/rails/app_rails_loader.rb
 
-This file is the longest file we've seen so far. Let's look at it in parts. The first part contains this:
+This file is the longest file we've seen so far. Let's look at it in parts. The first part contains:
 
 [source, ruby]
 ----
@@ -326,7 +325,12 @@ generate it and add it to source control:
 EOS
 ----
 
-This sets up a couple of constants: `RUBY`, `EXECUTABLES` and `BUNDLER_WARNING`. The `RUBY` constant defined here will be the path to the Ruby binary, which on my machine is `/Users/ryanbigg/.rubies/ruby-2.2.2/bin/ruby`. All of these constants are used in the latter half of the file, which contains the `exec_rails_app` method that was called from `rails/cli.rb`:
+This sets up a couple of constants: `RUBY`, `EXECUTABLES` and `BUNDLER_WARNING`.
+The `RUBY` constant defined here will be the path to the Ruby binary,
+which on my machine is `/Users/ryanbigg/.rubies/ruby-2.2.2/bin/ruby`.
+
+All of these constants are used in the latter half of the file, which contains
+the `exec_rails_app` method that was called from `rails/cli.rb`:
 
 [source, ruby]
 ----
@@ -363,7 +367,10 @@ def find_executable
 end
 ----
 
-The `exec_app_rails` method is quite long! What this method will do is attempt to find one of `bin/rails` or `script/rails` at the current path, and then if it can't find it there then it will go up a directory and look there instead. When it does find one of `bin/rails` or `script/rails`, it executes it using `exec` and this code:
+The `exec_app_rails` method is quite long! What this method will do is attempt to find one
+of `bin/rails` or `script/rails` at the current path. If it can't be found, it will go up a
+directory and look there instead. When it finds one of `bin/rails` or `script/rails`,
+it executes it using `exec` and this code:
 
 [source, ruby]
 ----
@@ -411,11 +418,18 @@ require_relative '../config/boot'
 require 'rails/commands'
 ----
 
-Because this file has been called from `exec`, the first line in the file needs to re-establish that we're running Ruby code, and it does this with the same Shebang we saw back in our original `[somewhere]/bin/rails` -- that's the one provided by the railties gem when it's installed.
+Because this file has been called from `exec`, the first line in the file needs to
+re-establish that we're running Ruby code. It does this with the same Shebang
+we saw back in our original `[somewhere]/bin/rails` -- that's the one provided by
+the railties gem when it's installed.
 
-After that, it defines a constant called `APP_PATH` which will be used to indicate to Rails that we're booting an application and not an engine. The path points to `config/application.rb` in our application.
+After that, it defines a constant called `APP_PATH` which will be used to tell
+Rails that we're booting an application and not an engine. The path points to
+`config/application.rb` in our application.
 
-The third line requires `config/boot.rb` using `require_relative` which is one of those new-fangled Ruby 1.9 features, and the first of many reasons why `ruby_version_check.rb` exists! That file comprises of these lines:
+The third line requires `config/boot.rb` using `require_relative`, which is one
+of those new-fangled Ruby 1.9 features, and the first of many reasons why
+`ruby_version_check.rb` exists! That file contains:
 
 .[our application]/config/boot.rb
 [source, ruby]
@@ -428,7 +442,7 @@ require 'bundler/setup' # Set up gems listed in the Gemfile.
 This file configures the environment variable `BUNDLE_GEMFILE`; but only if
 it's not already set. The final line requires `bundler/setup`, which is
 responsible for adding all the gems in the `Gemfile` to the `$LOAD_PATH`. This
-is what will enable some of the `require` calls to work in a little while.
+is what enables some of the `require` calls to work in a little while.
 
 The final line of `[our application]/bin/rails` will lead into where we go next: back to the Railties gem.
 
@@ -458,22 +472,23 @@ require 'rails/commands/commands_tasks'
 Rails::CommandsTasks.new(ARGV).run_command!(command)
 ----
 
-This is the file where those nice little shortcuts like `rails g` and `rails
-s` are defined. What this code will do is pick the first argument from `ARGV`
-with a quick `shift`, and then check to see if that argument has a key in the
-`aliases` method. If it doesn't, then it's assumed to be the command itself.
-So it doesn't matter if you run "rails server" or "rails s" after this point,
+This is the file where those shortcuts like `rails g` and `rails
+s` are defined. This code picks the first argument from `ARGV`
+with `shift`, then checks to see if that argument has a key in the
+`aliases` method. If it doesn't, it's assumed to be the command itself.
+It doesn't matter if you run "rails server" or "rails s" after this point,
 because command will always be "server".
 
 The next line requires `rails/commands/commands_tasks`. This is used to run
 the command that we've given it by initializing a new instance of
-`Rails::CommandsTasks`, and then calling `run_command!` on that, passing in
+`Rails::CommandsTasks`, and then calling `run_command!`, passing in
 the `command` variable as the only argument to this method. Let's look at what
 this does.
 
 === [railties gem]/lib/rails/commands_tasks.rb
 
-This is another large file. We're only interested in the `server` command, so let's look first at what the `run_command!` method does, and then the `server` command.
+This is another large file. We're only interested in the `server` command,
+so let's look first at what the `run_command!` method does, and then the `server` command.
 
 [source, ruby]
 .[railties gem]/lib/rails/commands_tasks.rb
@@ -520,16 +535,16 @@ This standardises the command that was passed in if that command was one of
 `'--version'`, `'-v'`, `'--help'` or `'-h'`. This is similar to the aliasing that
 was done previously in `rails/commands.rb`.
 
-Next, the `COMMAND_WHITELIST` constant is checked. If the command isn't listed
-there, then the `write_error_message` method is called, which will tell us
-that the command wasn't recognized. The remainder of the `write_error_message`
+Next, the `COMMAND_WHITELIST` constant is checked. If the command isn't listed,
+then the `write_error_message` method is called, telling us
+that the command wasn't recognized. The rest of the `write_error_message`
 command will check to see if there's a Rake task with the same name as the
-command. This is helpful if people ever try to run something like `rails
+command. This is helpful if people try to run something like `rails
 db:migrate`. The help text (not included in the above example because it's so
 damn long) at the top of this file is output if the command isn't found.
 
 We're on the path of the `server` command, and what `run_command!` does after
-checking if the command is on the whitelist is it calls `send` to call a
+checking if the whitelist contains the command is it uses `send` to call a
 method that matches that command's name. In the case of our sleuthing, this is
 the `server` method:
 
@@ -549,7 +564,8 @@ def server
 end
 ----
 
-The `server` command first calls `set_application_directory!`, and then comment above that method does a great job at explaining what that method is for:
+The `server` command first calls `set_application_directory!`, and then comment above
+that method does a great job at explaining what that method is for:
 
 [source, ruby]
 ----
@@ -573,7 +589,8 @@ def require_command!(command)
 end
 ----
 
-ALl that's doing is requiring `rails/commands/server.rb`, which defines the `Rails::Server` constant that we're about to use. Let's look at that file now.
+ALl that's doing is requiring `rails/commands/server.rb`, which defines the `Rails::Server` constant
+that we're about to use. Let's look at that file now.
 
 === [railties gem]/lib/rails/commands/server.rb
 
@@ -590,7 +607,8 @@ Rails::Server.new.tap do |server|
 end
 ----
 
-Since this is initializing an instance of the `Rails::Server` class, let's look at the `initialize` method from `Rails::Server` first:
+Since this is initializing an instance of the `Rails::Server` class, let's look at the `initialize`
+method from `Rails::Server` first:
 
 [source, ruby]
 ----
@@ -600,7 +618,8 @@ def initialize(*)
 end
 ----
 
-To understand what this method is about to do, we need to take a _huge_ step back and look at how the `Rails::Server` class is defined:
+To understand what this method does, we need to take a _huge_ step back and look
+at how the `Rails::Server` class is defined:
 
 [source, ruby]
 ----
@@ -614,8 +633,8 @@ module Rails
 ----
 
 There is a lot of complexity hidden in these lines. In order to understand
-what's about to happen we'll need to look at what the `action_dispatch` and
-`rails` requires are doing. It turns out that they do quite a lot.
+what's about to happen we'll need to look at what requiring `action_dispatch` and
+`rails` does. It turns out that they do quite a lot.
 
 
 
